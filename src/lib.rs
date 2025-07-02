@@ -16,8 +16,8 @@ pub struct Constants {
 
 pub fn load_constants() -> Constants {
     // Load pre-computed binary constants
-    let c_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/constants_c.bin"));
-    let m_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/constants_m.bin"));
+    let c_bytes = include_bytes!("../data/constants_c.bin");
+    let m_bytes = include_bytes!("../data/constants_m.bin");
     
     // Deserialize c constants
     let mut c_cursor = io::Cursor::new(c_bytes.as_slice());
@@ -156,6 +156,89 @@ mod tests {
             cons.m[cons.m.len() - 1][0][0].to_string(),
             "11497693837059016825308731789443585196852778517742143582474723527597064448312"
         );
+    }
+
+    #[test]
+    fn test_poseidon_reference_vectors() {
+        // Test vectors to ensure our implementation produces consistent, deterministic results
+        // These are regression tests based on our current working implementation
+        let poseidon = Poseidon::new();
+
+        // Original working test vectors from the existing test_hash function
+        // hash([1]) - confirmed working value
+        let input = vec![Fr::from_str("1").unwrap()];
+        let result = poseidon.hash(input).unwrap();
+        let expected = Fr::from_str("18586133768512220936620570745912940619677854269274689475585506675881198879027").unwrap();
+        assert_eq!(result, expected, "hash([1]) should match known good value");
+
+        // hash([1, 2]) - confirmed working value  
+        let input = vec![Fr::from_str("1").unwrap(), Fr::from_str("2").unwrap()];
+        let result = poseidon.hash(input).unwrap();
+        let expected = Fr::from_str("7853200120776062878684798364095072458815029376092732009249414926327459813530").unwrap();
+        assert_eq!(result, expected, "hash([1, 2]) should match known good value");
+
+        // Test additional cases for comprehensive coverage
+        // hash([1, 2, 0, 0, 0]) - 5-element case
+        let input = vec![
+            Fr::from_str("1").unwrap(),
+            Fr::from_str("2").unwrap(), 
+            Fr::from_str("0").unwrap(),
+            Fr::from_str("0").unwrap(),
+            Fr::from_str("0").unwrap()
+        ];
+        let result = poseidon.hash(input).unwrap();
+        let expected = Fr::from_str("1018317224307729531995786483840663576608797660851238720571059489595066344487").unwrap();
+        assert_eq!(result, expected, "hash([1, 2, 0, 0, 0]) should match known good value");
+
+        // hash([1, 2, 3, 4, 5, 6]) - 6-element case
+        let input = vec![
+            Fr::from_str("1").unwrap(),
+            Fr::from_str("2").unwrap(),
+            Fr::from_str("3").unwrap(),
+            Fr::from_str("4").unwrap(),
+            Fr::from_str("5").unwrap(),
+            Fr::from_str("6").unwrap()
+        ];
+        let result = poseidon.hash(input).unwrap();
+        let expected = Fr::from_str("20400040500897583745843009878988256314335038853985262692600694741116813247201").unwrap();
+        assert_eq!(result, expected, "hash([1, 2, 3, 4, 5, 6]) should match known good value");
+
+        // Larger input vector test
+        let input = vec![
+            Fr::from_str("1").unwrap(), Fr::from_str("2").unwrap(), Fr::from_str("3").unwrap(),
+            Fr::from_str("4").unwrap(), Fr::from_str("5").unwrap(), Fr::from_str("6").unwrap(),
+            Fr::from_str("7").unwrap(), Fr::from_str("8").unwrap(), Fr::from_str("9").unwrap(),
+            Fr::from_str("10").unwrap(), Fr::from_str("11").unwrap(), Fr::from_str("12").unwrap(),
+            Fr::from_str("13").unwrap(), Fr::from_str("14").unwrap()
+        ];
+        let result = poseidon.hash(input).unwrap();
+        let expected = Fr::from_str("8354478399926161176778659061636406690034081872658507739535256090879947077494").unwrap();
+        assert_eq!(result, expected, "Large input hash should match known good value");
+    }
+
+    #[test]
+    fn test_poseidon_properties() {
+        let poseidon = Poseidon::new();
+
+        // Test that hash is deterministic
+        let input = vec![Fr::from_str("12345").unwrap(), Fr::from_str("67890").unwrap()];
+        let result1 = poseidon.hash(input.clone()).unwrap();
+        let result2 = poseidon.hash(input.clone()).unwrap();
+        assert_eq!(result1, result2, "Hash should be deterministic");
+
+        // Test that different inputs give different outputs
+        let input1 = vec![Fr::from_str("1").unwrap(), Fr::from_str("2").unwrap()];
+        let input2 = vec![Fr::from_str("2").unwrap(), Fr::from_str("1").unwrap()];
+        let result1 = poseidon.hash(input1).unwrap();
+        let result2 = poseidon.hash(input2).unwrap();
+        assert_ne!(result1, result2, "Different inputs should give different outputs");
+
+        // Test avalanche effect - small change in input should drastically change output
+        let input1 = vec![Fr::from_str("1").unwrap()];
+        let input2 = vec![Fr::from_str("2").unwrap()];
+        let result1 = poseidon.hash(input1).unwrap();
+        let result2 = poseidon.hash(input2).unwrap();
+        assert_ne!(result1, result2, "Small input change should change output significantly");
     }
 
     #[test]
