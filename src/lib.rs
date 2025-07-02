@@ -1,8 +1,10 @@
+#![no_std]
+
 use ark_bn254::Fr;
 use ark_ff::{fields::Field, Zero};
 use ark_serialize::CanonicalDeserialize;
+use ark_std::{io, string::String, string::ToString, vec, vec::Vec};
 use core::ops::{AddAssign, MulAssign};
-use std::io;
 
 #[derive(Debug)]
 pub struct Constants {
