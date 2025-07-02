@@ -1,10 +1,8 @@
 use ark_bn254::Fr;
-use ark_ff::fields::Field;
-use ark_std::str::FromStr;
-use ark_std::Zero;
+use ark_ff::{fields::Field, Zero};
+use ark_serialize::CanonicalDeserialize;
 use core::ops::{AddAssign, MulAssign};
-
-mod constants;
+use std::io;
 
 #[derive(Debug)]
 pub struct Constants {
@@ -15,29 +13,48 @@ pub struct Constants {
 }
 
 pub fn load_constants() -> Constants {
-    let (c_str, m_str) = constants::constants();
-    let mut c: Vec<Vec<Fr>> = Vec::new();
-    for i in 0..c_str.len() {
-        let mut cci: Vec<Fr> = Vec::new();
-        for j in 0..c_str[i].len() {
-            let b: Fr = Fr::from_str(c_str[i][j]).unwrap();
-            cci.push(b);
+    // Load pre-computed binary constants
+    let c_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/constants_c.bin"));
+    let m_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/constants_m.bin"));
+    
+    // Deserialize c constants
+    let mut c_cursor = io::Cursor::new(c_bytes.as_slice());
+    let c_len = u32::deserialize_compressed(&mut c_cursor).unwrap() as usize;
+    let mut c: Vec<Vec<Fr>> = Vec::with_capacity(c_len);
+    
+    for _ in 0..c_len {
+        let inner_len = u32::deserialize_compressed(&mut c_cursor).unwrap() as usize;
+        let mut inner_vec: Vec<Fr> = Vec::with_capacity(inner_len);
+        
+        for _ in 0..inner_len {
+            let fr = Fr::deserialize_compressed(&mut c_cursor).unwrap();
+            inner_vec.push(fr);
         }
-        c.push(cci);
+        c.push(inner_vec);
     }
-    let mut m: Vec<Vec<Vec<Fr>>> = Vec::new();
-    for i in 0..m_str.len() {
-        let mut mi: Vec<Vec<Fr>> = Vec::new();
-        for j in 0..m_str[i].len() {
-            let mut mij: Vec<Fr> = Vec::new();
-            for k in 0..m_str[i][j].len() {
-                let b: Fr = Fr::from_str(m_str[i][j][k]).unwrap();
-                mij.push(b);
+    
+    // Deserialize m constants
+    let mut m_cursor = io::Cursor::new(m_bytes.as_slice());
+    let m_len = u32::deserialize_compressed(&mut m_cursor).unwrap() as usize;
+    let mut m: Vec<Vec<Vec<Fr>>> = Vec::with_capacity(m_len);
+    
+    for _ in 0..m_len {
+        let matrix_len = u32::deserialize_compressed(&mut m_cursor).unwrap() as usize;
+        let mut matrix: Vec<Vec<Fr>> = Vec::with_capacity(matrix_len);
+        
+        for _ in 0..matrix_len {
+            let inner_len = u32::deserialize_compressed(&mut m_cursor).unwrap() as usize;
+            let mut inner_vec: Vec<Fr> = Vec::with_capacity(inner_len);
+            
+            for _ in 0..inner_len {
+                let fr = Fr::deserialize_compressed(&mut m_cursor).unwrap();
+                inner_vec.push(fr);
             }
-            mi.push(mij);
+            matrix.push(inner_vec);
         }
-        m.push(mi);
+        m.push(matrix);
     }
+    
     Constants {
         c,
         m,
@@ -116,6 +133,7 @@ impl Poseidon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ark_std::str::FromStr;
 
     #[test]
     fn test_load_constants() {
