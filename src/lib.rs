@@ -6,7 +6,7 @@ use ark_serialize::CanonicalDeserialize;
 use ark_std::{io, string::String, string::ToString, vec, vec::Vec};
 use core::ops::{AddAssign, MulAssign};
 
-#[derive(Debug)]
+#[derive(Debug, CanonicalDeserialize)]
 pub struct Constants {
     pub c: Vec<Vec<Fr>>,
     pub m: Vec<Vec<Vec<Fr>>>,
@@ -16,55 +16,9 @@ pub struct Constants {
 
 pub fn load_constants() -> Constants {
     // Load pre-computed binary constants
-    let c_bytes = include_bytes!("../data/constants_c.bin");
-    let m_bytes = include_bytes!("../data/constants_m.bin");
-    
-    // Deserialize c constants
-    let mut c_cursor = io::Cursor::new(c_bytes.as_slice());
-    let c_len = u32::deserialize_compressed(&mut c_cursor).unwrap() as usize;
-    let mut c: Vec<Vec<Fr>> = Vec::with_capacity(c_len);
-    
-    for _ in 0..c_len {
-        let inner_len = u32::deserialize_compressed(&mut c_cursor).unwrap() as usize;
-        let mut inner_vec: Vec<Fr> = Vec::with_capacity(inner_len);
-        
-        for _ in 0..inner_len {
-            let fr = Fr::deserialize_compressed(&mut c_cursor).unwrap();
-            inner_vec.push(fr);
-        }
-        c.push(inner_vec);
-    }
-    
-    // Deserialize m constants
-    let mut m_cursor = io::Cursor::new(m_bytes.as_slice());
-    let m_len = u32::deserialize_compressed(&mut m_cursor).unwrap() as usize;
-    let mut m: Vec<Vec<Vec<Fr>>> = Vec::with_capacity(m_len);
-    
-    for _ in 0..m_len {
-        let matrix_len = u32::deserialize_compressed(&mut m_cursor).unwrap() as usize;
-        let mut matrix: Vec<Vec<Fr>> = Vec::with_capacity(matrix_len);
-        
-        for _ in 0..matrix_len {
-            let inner_len = u32::deserialize_compressed(&mut m_cursor).unwrap() as usize;
-            let mut inner_vec: Vec<Fr> = Vec::with_capacity(inner_len);
-            
-            for _ in 0..inner_len {
-                let fr = Fr::deserialize_compressed(&mut m_cursor).unwrap();
-                inner_vec.push(fr);
-            }
-            matrix.push(inner_vec);
-        }
-        m.push(matrix);
-    }
-    
-    Constants {
-        c,
-        m,
-        n_rounds_f: 8,
-        n_rounds_p: vec![
-            56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68,
-        ],
-    }
+    let c_bytes = include_bytes!("../data/constants.bin");
+    let constants: Constants = CanonicalDeserialize::deserialize_uncompressed(&c_bytes[..]).unwrap();
+    constants
 }
 
 pub struct Poseidon {
