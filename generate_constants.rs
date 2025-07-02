@@ -1,5 +1,4 @@
 use ark_bn254::Fr;
-use ark_serialize::CanonicalSerialize;
 use ark_std::{str::FromStr, vec::Vec};
 use std::fs::File;
 use std::io::Write;
@@ -9,64 +8,50 @@ mod src {
     pub mod constants;
 }
 
-#[derive(CanonicalSerialize)]
-pub struct Constants {
-    pub c: Vec<Vec<Fr>>,
-    pub m: Vec<Vec<Vec<Fr>>>,
-    pub n_rounds_f: usize,
-    pub n_rounds_p: Vec<usize>,
-}
-
 fn main() {
-    println!("Generating pre-serialized constants...");
+    println!("Generating static constants code...");
     
     // Load string constants
     let (c_str, m_str) = src::constants::constants();
     
-    // Convert to Fr elements
-    let mut c: Vec<Vec<Fr>> = Vec::new();
+    let mut output = String::new();
+    output.push_str("use ark_bn254::Fr;\n");
+    output.push_str("use ark_ff::MontFp;\n\n");
+    
+    // Generate C constants
+    output.push_str("pub static C_CONSTANTS: &[&[Fr]] = &[\n");
     for i in 0..c_str.len() {
-        let mut cci: Vec<Fr> = Vec::new();
+        output.push_str("    &[\n");
         for j in 0..c_str[i].len() {
-            let fr: Fr = Fr::from_str(c_str[i][j]).unwrap();
-            cci.push(fr);
+            output.push_str(&format!("        MontFp!(\"{}\"),\n", c_str[i][j]));
         }
-        c.push(cci);
+        output.push_str("    ],\n");
     }
+    output.push_str("];\n\n");
     
-    let mut m: Vec<Vec<Vec<Fr>>> = Vec::new();
+    // Generate M constants
+    output.push_str("pub static M_CONSTANTS: &[&[&[Fr]]] = &[\n");
     for i in 0..m_str.len() {
-        let mut mi: Vec<Vec<Fr>> = Vec::new();
+        output.push_str("    &[\n");
         for j in 0..m_str[i].len() {
-            let mut mij: Vec<Fr> = Vec::new();
+            output.push_str("        &[\n");
             for k in 0..m_str[i][j].len() {
-                let fr: Fr = Fr::from_str(m_str[i][j][k]).unwrap();
-                mij.push(fr);
+                output.push_str(&format!("            MontFp!(\"{}\"),\n", m_str[i][j][k]));
             }
-            mi.push(mij);
+            output.push_str("        ],\n");
         }
-        m.push(mi);
+        output.push_str("    ],\n");
     }
+    output.push_str("];\n\n");
     
-    // Create the complete Constants struct
-    let constants = Constants {
-        c,
-        m,
-        n_rounds_f: 8,
-        n_rounds_p: vec![
-            56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68,
-        ],
-    };
+    // Generate rounds constants
+    output.push_str("pub const N_ROUNDS_F: usize = 8;\n");
+    output.push_str("pub static N_ROUNDS_P: &[usize] = &[56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68];\n");
     
-    // Serialize the entire struct
-    let mut serialized = Vec::new();
-    constants.serialize_uncompressed(&mut serialized).unwrap();
+    // Write to src directory
+    let mut file = File::create("src/static_constants.rs").unwrap();
+    file.write_all(output.as_bytes()).unwrap();
     
-    // Write to data directory
-    std::fs::create_dir_all("data").unwrap();
-    let mut file = File::create("data/constants.bin").unwrap();
-    file.write_all(&serialized).unwrap();
-    
-    println!("Generated data/constants.bin ({} bytes)", serialized.len());
-    println!("Constants generation complete!");
+    println!("Generated src/static_constants.rs");
+    println!("Static constants generation complete!");
 } 

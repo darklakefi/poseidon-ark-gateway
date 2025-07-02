@@ -2,33 +2,16 @@
 
 use ark_bn254::Fr;
 use ark_ff::{fields::Field, Zero};
-use ark_serialize::CanonicalDeserialize;
-use ark_std::{io, string::String, string::ToString, vec, vec::Vec};
+use ark_std::{string::String, string::ToString, vec, vec::Vec};
 use core::ops::{AddAssign, MulAssign};
 
-#[derive(Debug, CanonicalDeserialize)]
-pub struct Constants {
-    pub c: Vec<Vec<Fr>>,
-    pub m: Vec<Vec<Vec<Fr>>>,
-    pub n_rounds_f: usize,
-    pub n_rounds_p: Vec<usize>,
-}
+mod static_constants;
+use static_constants::*;
 
-pub fn load_constants() -> Constants {
-    // Load pre-computed binary constants
-    let c_bytes = include_bytes!("../data/constants.bin");
-    let constants: Constants = CanonicalDeserialize::deserialize_uncompressed(&c_bytes[..]).unwrap();
-    constants
-}
-
-pub struct Poseidon {
-    constants: Constants,
-}
+pub struct Poseidon;
 impl Poseidon {
     pub fn new() -> Poseidon {
-        Poseidon {
-            constants: load_constants(),
-        }
+        Poseidon
     }
     pub fn ark(&self, state: &mut Vec<Fr>, c: &[Fr], it: usize) {
         for i in 0..state.len() {
@@ -52,7 +35,7 @@ impl Poseidon {
         }
     }
 
-    pub fn mix(&self, state: &Vec<Fr>, m: &[Vec<Fr>]) -> Vec<Fr> {
+    pub fn mix(&self, state: &Vec<Fr>, m: &[&[Fr]]) -> Vec<Fr> {
         let mut new_state: Vec<Fr> = Vec::new();
         for i in 0..state.len() {
             new_state.push(Fr::zero());
@@ -67,19 +50,19 @@ impl Poseidon {
 
     pub fn hash(&self, inp: Vec<Fr>) -> Result<Fr, String> {
         let t = inp.len() + 1;
-        if inp.is_empty() || inp.len() > self.constants.n_rounds_p.len() {
+        if inp.is_empty() || inp.len() > N_ROUNDS_P.len() {
             return Err("Wrong inputs length".to_string());
         }
-        let n_rounds_f = self.constants.n_rounds_f.clone();
-        let n_rounds_p = self.constants.n_rounds_p[t - 2].clone();
+        let n_rounds_f = N_ROUNDS_F;
+        let n_rounds_p = N_ROUNDS_P[t - 2];
 
         let mut state = vec![Fr::zero(); t];
         state[1..].clone_from_slice(&inp);
 
         for i in 0..(n_rounds_f + n_rounds_p) {
-            self.ark(&mut state, &self.constants.c[t - 2], i * t);
+            self.ark(&mut state, C_CONSTANTS[t - 2], i * t);
             self.sbox(n_rounds_f, n_rounds_p, &mut state, i);
-            state = self.mix(&state, &self.constants.m[t - 2]);
+            state = self.mix(&state, M_CONSTANTS[t - 2]);
         }
 
         Ok(state[0])
@@ -93,21 +76,20 @@ mod tests {
 
     #[test]
     fn test_load_constants() {
-        let cons = load_constants();
         assert_eq!(
-            cons.c[0][0].to_string(),
+            C_CONSTANTS[0][0].to_string(),
             "4417881134626180770308697923359573201005643519861877412381846989312604493735"
         );
         assert_eq!(
-            cons.c[cons.c.len() - 1][0].to_string(),
+            C_CONSTANTS[C_CONSTANTS.len() - 1][0].to_string(),
             "21579410516734741630578831791708254656585702717204712919233299001262271512412"
         );
         assert_eq!(
-            cons.m[0][0][0].to_string(),
+            M_CONSTANTS[0][0][0].to_string(),
             "2910766817845651019878574839501801340070030115151021261302834310722729507541"
         );
         assert_eq!(
-            cons.m[cons.m.len() - 1][0][0].to_string(),
+            M_CONSTANTS[M_CONSTANTS.len() - 1][0][0].to_string(),
             "11497693837059016825308731789443585196852778517742143582474723527597064448312"
         );
     }
