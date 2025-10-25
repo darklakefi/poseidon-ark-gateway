@@ -1,11 +1,11 @@
 [package]
-name = "poseidon-ark"
-version = "0.0.2"
-authors = ["arnaucube <root@arnaucube.com>"]
+name = "darklake-poseidon-ark"
+version = "0.0.3"
+authors = ["arnaucube <root@arnaucube.com>", "Darklake team"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Poseidon hash implementation"
-repository = "https://github.com/arnaucube/poseidon-ark"
+repository = "https://github.com/darklakefi/poseidon-ark-gateway"
 readme = "README.md"
 
 [dependencies]
